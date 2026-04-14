@@ -182,32 +182,68 @@ function SharedGameCanvas({
     };
   }, []);
 
-  // Fullscreen mobile
+  // Fullscreen universal
   useEffect(() => {
-    const enterFullscreen = () => {
-      // Scroll para esconder barra de endereço em iOS
-      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-        window.scrollTo(0, 1);
-      }
+    const enterFullscreen = async () => {
       // Tentar fullscreen API
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch {
+        // Ignorar erro de fullscreen
       }
-      // Lock orientação landscape
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const orientation = (screen as any).orientation;
-      if (orientation?.lock) {
-        orientation.lock('landscape').catch(() => {});
+
+      // Lock landscape
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orientation = (screen as any).orientation;
+        if (orientation?.lock) {
+          await orientation.lock('landscape');
+        }
+      } catch {
+        // Ignorar erro de lock orientation
+      }
+
+      // Esconder barra iOS
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        setTimeout(() => window.scrollTo(0, 1), 100);
       }
     };
 
-    // Entrar fullscreen ao carregar
-    setTimeout(enterFullscreen, 100);
-
-    // Re-entrar ao mudar orientação
+    // Entrar ao carregar e ao mudar orientação
+    enterFullscreen();
     window.addEventListener('orientationchange', enterFullscreen);
 
     return () => window.removeEventListener('orientationchange', enterFullscreen);
+  }, []);
+
+  // Resize dinâmico - mesa responsiva
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Calcular dimensões ótimas mantendo 2:1
+      let width = vw * 0.95;
+      let height = width * 0.5;
+
+      if (height > vh * 0.9) {
+        height = vh * 0.9;
+        width = height * 2;
+      }
+
+      // Aplicar ao canvas
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -456,11 +492,11 @@ function SharedGameCanvas({
       </header>
 
       {/* Game area */}
-      <section className="relative flex flex-1 overflow-hidden">
-        {/* Canvas container - responsivo */}
+      <section className="game-container relative flex flex-1 overflow-hidden">
+        {/* Canvas container - responsivo universal */}
         <div
           ref={containerRef}
-          className="game-container-mobile game-canvas-container flex flex-1 items-center justify-center overflow-hidden p-2"
+          className="game-canvas-wrapper flex flex-1 items-center justify-center overflow-hidden p-2"
         >
           <div
             className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
@@ -518,7 +554,7 @@ function HudPanel({
   onHide: () => void;
 }): JSX.Element {
   return (
-    <aside className="hud-mobile absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
+    <aside className="hud-overlay absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">Match</h2>
         <button
