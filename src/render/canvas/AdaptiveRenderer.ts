@@ -204,68 +204,65 @@ export class AdaptiveRenderer {
   }
 
   renderCue(cue: Cue, phase: GamePhase, whiteBall: { x: number; y: number }) {
-    if (phase !== 'aiming' && phase !== 'charging') return;
-
+    // Sempre mostrar o taco, não apenas em aiming/charging
     const { ctx } = this;
     const ballPos = this.toScreen(whiteBall.x, whiteBall.y);
-    const angleRad = (cue.angle * Math.PI) / 180;
 
-    // Linha de mira (tracejada)
-    const aimLength = Math.min(300, this.TABLE_W * 0.4);
-    const aimEnd = this.toScreen(
-      whiteBall.x + Math.cos(angleRad) * aimLength,
-      whiteBall.y + Math.sin(angleRad) * aimLength
-    );
+    // Converter ângulo para radianos (invertido porque o taco aponta para trás)
+    const angleRad = ((cue.angle + 180) * Math.PI) / 180;
 
-    ctx.beginPath();
-    ctx.moveTo(ballPos.x, ballPos.y);
-    ctx.lineTo(aimEnd.x, aimEnd.y);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1.5 * this.scale;
-    ctx.setLineDash([4 * this.scale, 4 * this.scale]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    // Linha de mira (tracejada) - só em aiming/charging
+    if (phase === 'aiming' || phase === 'charging') {
+      const aimLength = Math.min(200, this.TABLE_W * 0.3);
+      const aimEndX = ballPos.x + Math.cos(angleRad) * aimLength;
+      const aimEndY = ballPos.y + Math.sin(angleRad) * aimLength;
 
-    // Taco
+      ctx.beginPath();
+      ctx.moveTo(ballPos.x, ballPos.y);
+      ctx.lineTo(aimEndX, aimEndY);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2 * this.scale;
+      ctx.setLineDash([6 * this.scale, 6 * this.scale]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Taco - posicionado atrás da bola branca
     const isMobile = this.viewport.device === 'mobile';
-    const recoil = phase === 'charging' ? cue.power * 0.4 * this.scale : 0;
-    const cueDist = (isMobile ? 25 : 35) * this.scale + recoil;
-    const cueLen = (isMobile ? 100 : 140) * this.scale;
+    const recoil = (phase === 'charging' ? cue.power * 0.3 : 0) * this.scale;
+    const cueDist = (isMobile ? 30 : 40) * this.scale + recoil;
+    const cueLen = (isMobile ? 120 : 160) * this.scale;
 
+    // Posição do taco (atrás da bola, na direção oposta ao ângulo)
     const startX = ballPos.x - Math.cos(angleRad) * cueDist;
     const startY = ballPos.y - Math.sin(angleRad) * cueDist;
     const endX = startX - Math.cos(angleRad) * cueLen;
     const endY = startY - Math.sin(angleRad) * cueLen;
 
-    // Sombra do taco
-    ctx.beginPath();
-    ctx.moveTo(startX + 2, startY + 2);
-    ctx.lineTo(endX + 2, endY + 2);
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = (isMobile ? 5 : 7) * this.scale;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    // Taco principal
-    const cueGrad = ctx.createLinearGradient(startX, startY, endX, endY);
-    cueGrad.addColorStop(0, '#e8c4a0');
-    cueGrad.addColorStop(0.5, '#c49a6c');
-    cueGrad.addColorStop(1, '#5c3a21');
-
+    // Taco principal - cor sólida visível
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
-    ctx.strokeStyle = cueGrad;
-    ctx.lineWidth = (isMobile ? 4 : 6) * this.scale;
+    ctx.strokeStyle = '#d4a574';
+    ctx.lineWidth = Math.max(4, 6 * this.scale);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Ponta do taco - mais escura
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(startX - Math.cos(angleRad) * 20 * this.scale, startY - Math.sin(angleRad) * 20 * this.scale);
+    ctx.strokeStyle = '#8b5a2b';
+    ctx.lineWidth = Math.max(4, 6 * this.scale);
     ctx.lineCap = 'round';
     ctx.stroke();
 
     // Anel dourado na ponta
-    const ringX = startX - Math.cos(angleRad) * (6 * this.scale);
-    const ringY = startY - Math.sin(angleRad) * (6 * this.scale);
+    const ringX = startX - Math.cos(angleRad) * (8 * this.scale);
+    const ringY = startY - Math.sin(angleRad) * (8 * this.scale);
     ctx.beginPath();
-    ctx.arc(ringX, ringY, 2.5 * this.scale, 0, Math.PI * 2);
-    ctx.fillStyle = '#fbbf24';
+    ctx.arc(ringX, ringY, Math.max(3, 3 * this.scale), 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
     ctx.fill();
   }
 

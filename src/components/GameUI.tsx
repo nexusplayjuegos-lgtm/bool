@@ -31,6 +31,10 @@ export function GameUI({
 }: GameUIProps) {
   const [showControls, setShowControls] = useState(false);
   const [hideTimeout, setHideTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showIosHint, setShowIosHint] = useState(false);
+
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = typeof window !== 'undefined' && (window.navigator as unknown as { standalone?: boolean }).standalone;
 
   const scheduleHide = useCallback(() => {
     if (hideTimeout) clearTimeout(hideTimeout);
@@ -95,15 +99,28 @@ export function GameUI({
             </button>
 
             {!isFullscreen && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFullscreen();
-                }}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500"
-              >
-                ⛶ Fullscreen
-              </button>
+              <div className="flex gap-2">
+                {isIOS && !isStandalone && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowIosHint(true);
+                    }}
+                    className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-amber-500"
+                  >
+                    📱 iOS
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFullscreen();
+                  }}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500"
+                >
+                  ⛶ Fullscreen
+                </button>
+              </div>
             )}
 
             {isFullscreen && (
@@ -164,6 +181,33 @@ export function GameUI({
                 {lastShotValid ? 'Valid shot' : fouls.length > 0 ? fouls[0] : 'Foul'}
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Add to Home Screen hint */}
+      {showIosHint && (
+        <div
+          className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          onClick={() => setShowIosHint(false)}
+        >
+          <div className="max-w-sm rounded-2xl bg-[#1a1a2e] p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 text-4xl">📱</div>
+            <h3 className="mb-2 text-lg font-bold text-white">True Fullscreen on iOS</h3>
+            <p className="mb-4 text-sm text-white/70">
+              To hide the browser completely:
+            </p>
+            <ol className="mb-4 text-left text-sm text-white/80 space-y-2">
+              <li>1. Tap the <strong>Share</strong> button ⬆️</li>
+              <li>2. Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong></li>
+              <li>3. Open the app from your home screen</li>
+            </ol>
+            <button
+              onClick={() => setShowIosHint(false)}
+              className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

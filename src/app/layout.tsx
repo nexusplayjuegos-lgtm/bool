@@ -16,8 +16,22 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Sinuca Premiere',
-  description: 'Premium Brazilian pool prototype built with Next.js, Matter.js and canvas rendering.',
+  title: 'Bool - Sinuca Premiere',
+  description: 'Premium pool game with realistic physics',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Bool',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
