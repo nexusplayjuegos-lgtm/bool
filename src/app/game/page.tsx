@@ -218,33 +218,8 @@ function SharedGameCanvas({
     return () => window.removeEventListener('orientationchange', enterFullscreen);
   }, []);
 
-  // Resize dinâmico - mesa responsiva
-  useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      // Calcular dimensões ótimas mantendo 2:1
-      let width = vw * 0.95;
-      let height = width * 0.5;
-
-      if (height > vh * 0.9) {
-        height = vh * 0.9;
-        width = height * 2;
-      }
-
-      // Aplicar ao canvas
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // CSS controla o tamanho da mesa (não JavaScript)
+  // O canvas tem classe .game-canvas com width/height definidos no CSS
 
   useEffect(() => {
     if (!canvasRef.current) {
