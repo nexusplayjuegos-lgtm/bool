@@ -432,7 +432,7 @@ function SharedGameCanvas({
         {/* Canvas container */}
         <div
           ref={containerRef}
-          className="flex flex-1 items-center justify-center overflow-hidden p-2"
+          className="game-container-mobile flex flex-1 items-center justify-center overflow-hidden p-2"
         >
           <div
             className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
@@ -448,7 +448,7 @@ function SharedGameCanvas({
               onTouchMove={handleTouchMove}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
-              className="block h-full w-full cursor-crosshair touch-none"
+              className="game-canvas block h-full w-full cursor-crosshair touch-none"
               style={{ width: '100%', height: '100%', touchAction: 'none' }}
             />
           </div>
@@ -491,7 +491,7 @@ function HudPanel({
   onHide: () => void;
 }): JSX.Element {
   return (
-    <aside className="absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
+    <aside className="hud-mobile absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">Match</h2>
         <button

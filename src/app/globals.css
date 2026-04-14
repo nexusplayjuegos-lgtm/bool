@@ -48,3 +48,43 @@ canvas {
 :-ms-fullscreen {
   background: #0a0a0f;
 }
+
+/* ============================================
+   MOBILE OPTIMIZATION - FASE 1 V2
+   CSS-only com media queries
+   ============================================ */
+
+@media (max-width: 768px) {
+  /* Touch otimizado - apenas mobile */
+  .game-canvas {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Reduzir padding apenas em mobile */
+  .game-container-mobile {
+    padding: 4px !important;
+  }
+
+  /* HUD compacto em mobile */
+  .hud-mobile {
+    position: fixed !important;
+    right: 8px !important;
+    top: 8px !important;
+    width: 160px !important;
+    transform: scale(0.85);
+    transform-origin: top right;
+  }
+}
+
+/* Safe area para notch (iOS) */
+@supports (-webkit-touch-callout: none) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
