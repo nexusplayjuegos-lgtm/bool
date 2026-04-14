@@ -48,3 +48,45 @@ canvas {
 :-ms-fullscreen {
   background: #0a0a0f;
 }
+
+/* Safari iOS fixes for fullscreen */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific styles */
+  html {
+    height: -webkit-fill-available;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* Hide scrollbars but allow scrolling */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Safe area insets for notch devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Animation duration for drawer */
+.duration-250 {
+  transition-duration: 250ms;
+}
+
+/* Prevent text selection on game elements */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}

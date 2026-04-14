@@ -10,6 +10,7 @@ import { useGame } from '@/hooks/useGame';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
+import { SandwichMenu } from '@/components/SandwichMenu';
 
 const TABLE_WIDTH = 1200;
 const TABLE_HEIGHT = 600;
@@ -404,9 +405,9 @@ function SharedGameCanvas({
   }
 
   return (
-    <main className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
-      {/* Minimal header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
+    <main className="relative flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
+      {/* Minimal header - hidden on mobile */}
+      <header className="hidden shrink-0 items-center justify-between border-b border-white/10 px-3 py-2 md:flex md:px-6 md:py-3">
         <h1 className="text-sm font-semibold text-white/80 md:text-lg">
           {multiplayer ? `Room · P${playerNumber}` : 'Bool Eight'}
         </h1>
@@ -429,13 +430,13 @@ function SharedGameCanvas({
 
       {/* Game area */}
       <section className="relative flex flex-1 overflow-hidden">
-        {/* Canvas container */}
+        {/* Canvas container - full screen on mobile */}
         <div
           ref={containerRef}
-          className="flex flex-1 items-center justify-center overflow-hidden p-2"
+          className="flex flex-1 items-center justify-center overflow-hidden p-0 md:p-2"
         >
           <div
-            className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+            className="h-full w-full overflow-hidden md:rounded-[10px] md:border md:border-white/10 md:bg-black/30"
             style={tableCardStyle}
           >
             <canvas
@@ -454,24 +455,37 @@ function SharedGameCanvas({
           </div>
         </div>
 
-        {/* HUD */}
-        {showHud ? (
-          <HudPanel
+        {/* Desktop HUD - painel lateral */}
+        <div className="hidden md:block">
+          {showHud ? (
+            <HudPanel
+              game={game}
+              isMyTurn={isMyTurn}
+              multiplayer={multiplayer}
+              recentEvents={recentEvents}
+              onHide={() => setShowHud(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowHud(true)}
+              className="absolute bottom-4 left-1/2 right-auto -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-[11px] text-white/40 backdrop-blur"
+            >
+              Tap for controls
+            </button>
+          )}
+        </div>
+
+        {/* Mobile Sandwich Menu */}
+        <div className="md:hidden">
+          <SandwichMenu
             game={game}
             isMyTurn={isMyTurn}
             multiplayer={multiplayer}
-            recentEvents={recentEvents}
-            onHide={() => setShowHud(false)}
+            onReset={game.resetGame}
+            onHome={() => {}}
           />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowHud(true)}
-            className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-[11px] text-white/40 backdrop-blur md:bottom-4 md:left-1/2 md:right-auto md:-translate-x-1/2"
-          >
-            Tap for controls
-          </button>
-        )}
+        </div>
       </section>
     </main>
   );
@@ -491,7 +505,7 @@ function HudPanel({
   onHide: () => void;
 }): JSX.Element {
   return (
-    <aside className="absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
+    <aside className="absolute right-2 top-2 w-[220px] rounded-2xl border border-white/10 bg-black/55 p-3 backdrop-blur-md sm:right-4 sm:top-4 sm:w-[260px] md:right-6 md:top-6 md:w-[290px] md:p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">Match</h2>
         <button
