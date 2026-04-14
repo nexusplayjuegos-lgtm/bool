@@ -19,16 +19,25 @@ function GamePageContent(): JSX.Element {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<AdaptiveRenderer | null>(null);
-  const gameRef = useRef<ReturnType<typeof createGame> | null>(null);
+  const gameStoreRef = useRef<ReturnType<typeof createGame> | null>(null);
   const animationRef = useRef<number>(0);
-  const lastTimeRef = useRef<number>(0);
 
-  // Initialize game store
-  if (!gameRef.current) {
-    gameRef.current = createGame(gameMode);
+  // Initialize game store once
+  if (!gameStoreRef.current) {
+    gameStoreRef.current = createGame(gameMode);
   }
 
-  const game = gameRef.current();
+  const gameStore = gameStoreRef.current;
+
+  // Subscribe to game state changes
+  const [gameState, setGameState] = useState(() => gameStore.getState());
+
+  useEffect(() => {
+    const unsubscribe = gameStore.subscribe((state) => {
+      setGameState(state);
+    });
+    return unsubscribe;
+  }, [gameStore]);
 
   // Viewport state
   const [viewport, setViewport] = useState<{
@@ -76,31 +85,26 @@ function GamePageContent(): JSX.Element {
     }
   }, [viewport]);
 
-  // Render loop - optimized at 60fps
+  // Render loop
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const render = (timestamp: number) => {
-      // Throttle to ~60fps
-      if (timestamp - lastTimeRef.current < 16) {
-        animationRef.current = requestAnimationFrame(render);
-        return;
-      }
-      lastTimeRef.current = timestamp;
-
-      const currentGame = game;
+    const render = () => {
+      const state = gameStore.getState();
 
       renderer.clear();
-      renderer.renderTable(currentGame.table);
+      renderer.renderTable(state.table);
 
-      currentGame.balls.forEach((ball) => {
-        renderer.renderBall(ball);
+      state.balls.forEach((ball) => {
+        if (!ball.inPocket) {
+          renderer.renderBall(ball);
+        }
       });
 
-      const whiteBall = currentGame.balls.find((b) => b.id === 'white');
-      if (whiteBall) {
-        renderer.renderCue(currentGame.cue, currentGame.phase, whiteBall.position);
+      const whiteBall = state.balls.find((b) => b.id === 'white');
+      if (whiteBall && !whiteBall.inPocket) {
+        renderer.renderCue(state.cue, state.phase, whiteBall.position);
       }
 
       animationRef.current = requestAnimationFrame(render);
@@ -111,7 +115,7 @@ function GamePageContent(): JSX.Element {
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [game]);
+  }, [gameStore]);
 
   // Input handlers
   const getPointerPosition = useCallback(
@@ -135,32 +139,35 @@ function GamePageContent(): JSX.Element {
       const point = getPointerPosition(e.clientX, e.clientY);
       if (!point) return;
 
-      if (game.phase === 'aiming') {
-        game.updateAim(point);
-      } else if (game.phase === 'charging') {
-        const whiteBall = game.balls.find((b) => b.id === 'white');
+      const state = gameStore.getState();
+      if (state.phase === 'aiming') {
+        gameStore.getState().updateAim(point);
+      } else if (state.phase === 'charging') {
+        const whiteBall = state.balls.find((b) => b.id === 'white');
         if (!whiteBall) return;
 
         const dx = point.x - whiteBall.position.x;
         const dy = point.y - whiteBall.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        game.updatePower(Math.min(100, Math.max(10, distance * 0.5)));
+        gameStore.getState().updatePower(Math.min(100, Math.max(10, distance * 0.5)));
       }
     },
-    [game, getPointerPosition]
+    [gameStore, getPointerPosition]
   );
 
   const handleMouseDown = useCallback(() => {
-    if (game.phase === 'aiming') {
-      game.startCharging();
+    const state = gameStore.getState();
+    if (state.phase === 'aiming') {
+      gameStore.getState().startCharging();
     }
-  }, [game]);
+  }, [gameStore]);
 
   const handleMouseUp = useCallback(() => {
-    if (game.phase === 'charging') {
-      game.shoot();
+    const state = gameStore.getState();
+    if (state.phase === 'charging') {
+      gameStore.getState().shoot();
     }
-  }, [game]);
+  }, [gameStore]);
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent) => {
@@ -171,39 +178,42 @@ function GamePageContent(): JSX.Element {
       const point = getPointerPosition(touch.clientX, touch.clientY);
       if (!point) return;
 
-      if (game.phase === 'aiming') {
-        game.updateAim(point);
-      } else if (game.phase === 'charging') {
-        const whiteBall = game.balls.find((b) => b.id === 'white');
+      const state = gameStore.getState();
+      if (state.phase === 'aiming') {
+        gameStore.getState().updateAim(point);
+      } else if (state.phase === 'charging') {
+        const whiteBall = state.balls.find((b) => b.id === 'white');
         if (!whiteBall) return;
 
         const dx = point.x - whiteBall.position.x;
         const dy = point.y - whiteBall.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        game.updatePower(Math.min(100, Math.max(10, distance * 0.5)));
+        gameStore.getState().updatePower(Math.min(100, Math.max(10, distance * 0.5)));
       }
     },
-    [game, getPointerPosition]
+    [gameStore, getPointerPosition]
   );
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       e.preventDefault();
-      if (game.phase === 'aiming') {
-        game.startCharging();
+      const state = gameStore.getState();
+      if (state.phase === 'aiming') {
+        gameStore.getState().startCharging();
       }
     },
-    [game]
+    [gameStore]
   );
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       e.preventDefault();
-      if (game.phase === 'charging') {
-        game.shoot();
+      const state = gameStore.getState();
+      if (state.phase === 'charging') {
+        gameStore.getState().shoot();
       }
     },
-    [game]
+    [gameStore]
   );
 
   return (
@@ -223,13 +233,13 @@ function GamePageContent(): JSX.Element {
 
       {/* Game UI */}
       <GameUI
-        mode={game.mode}
-        scores={game.scores}
-        currentPlayer={game.currentPlayer}
-        phase={game.phase}
-        power={game.cue.power}
-        fouls={game.fouls}
-        lastShotValid={game.lastShotValid}
+        mode={gameState.mode}
+        scores={gameState.scores}
+        currentPlayer={gameState.currentPlayer}
+        phase={gameState.phase}
+        power={gameState.cue.power}
+        fouls={gameState.fouls}
+        lastShotValid={gameState.lastShotValid}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onExit={() => router.push('/')}
