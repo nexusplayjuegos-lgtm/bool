@@ -3,7 +3,7 @@ import { LayerManager } from './LayerManager';
 
 // ARQUITETO: Feature flag para Canvas Layering Fase 2
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const USE_LAYER_MANAGER = false; // Iniciar desligado, ativar após testes
+const USE_LAYER_MANAGER = true; // ATIVADO - Fase 2
 void USE_LAYER_MANAGER; // Suprimir warning de variável não utilizada
 
 interface RenderConfig {
