@@ -13,7 +13,7 @@ import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
 
 const TABLE_WIDTH = 1200;
 const TABLE_HEIGHT = 600;
-const VIEWPORT_PADDING = 16;
+const MOBILE_SHORT_HEIGHT = 540;
 
 type PlayerNumber = 1 | 2;
 
@@ -159,67 +159,91 @@ function SharedGameCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<PremiumRenderer | null>(null);
   const latestGameRef = useRef<GameStoreView>(game);
+  const resizeFrameRef = useRef<number | null>(null);
   const [showHud, setShowHud] = useState(true);
   const [canvasScale, setCanvasScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ width: TABLE_WIDTH, height: TABLE_HEIGHT });
 
   latestGameRef.current = game;
 
   const isMyTurn = multiplayer ? (isMultiplayerGameView(game) ? game.isMyTurn : false) : true;
   const recentEvents = useMemo(() => game.events.slice(-4).reverse(), [game.events]);
+  const isCompactLandscape = useMemo(
+    () => !isPortrait && viewportSize.height <= MOBILE_SHORT_HEIGHT,
+    [isPortrait, viewportSize.height]
+  );
 
-  // Detect portrait mode
   useEffect(() => {
-    const checkOrientation = (): void => {
-      setIsPortrait(window.innerHeight > window.innerWidth);
+    const syncViewport = (): void => {
+      const nextWidth = window.visualViewport?.width ?? window.innerWidth;
+      const nextHeight = window.visualViewport?.height ?? window.innerHeight;
+
+      setViewportSize({
+        width: Math.round(nextWidth),
+        height: Math.round(nextHeight),
+      });
+      setIsPortrait(nextHeight > nextWidth);
     };
-    checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
+
+    const scheduleSync = (): void => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+      }
+
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        syncViewport();
+      });
+    };
+
+    syncViewport();
+    window.addEventListener('resize', scheduleSync);
+    window.addEventListener('orientationchange', scheduleSync);
+    window.visualViewport?.addEventListener('resize', scheduleSync);
+    window.visualViewport?.addEventListener('scroll', scheduleSync);
+
     return () => {
-      window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+      }
+      window.removeEventListener('resize', scheduleSync);
+      window.removeEventListener('orientationchange', scheduleSync);
+      window.visualViewport?.removeEventListener('resize', scheduleSync);
+      window.visualViewport?.removeEventListener('scroll', scheduleSync);
     };
   }, []);
 
-  // Fullscreen universal
   useEffect(() => {
-    const enterFullscreen = async () => {
-      // Tentar fullscreen API
+    const enterFullscreen = async (): Promise<void> => {
       try {
         if (document.documentElement.requestFullscreen) {
           await document.documentElement.requestFullscreen();
         }
       } catch {
-        // Ignorar erro de fullscreen
       }
 
-      // Lock landscape
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const orientation = (screen as any).orientation;
+        const orientation = (screen as Screen & {
+          orientation?: { lock?: (value: string) => Promise<void> };
+        }).orientation;
+
         if (orientation?.lock) {
           await orientation.lock('landscape');
         }
       } catch {
-        // Ignorar erro de lock orientation
       }
 
-      // Esconder barra iOS
       if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
         setTimeout(() => window.scrollTo(0, 1), 100);
       }
     };
 
-    // Entrar ao carregar e ao mudar orientação
-    enterFullscreen();
+    void enterFullscreen();
     window.addEventListener('orientationchange', enterFullscreen);
 
     return () => window.removeEventListener('orientationchange', enterFullscreen);
   }, []);
-
-  // CSS controla o tamanho da mesa (não JavaScript)
-  // O canvas tem classe .game-canvas com width/height definidos no CSS
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -237,7 +261,6 @@ function SharedGameCanvas({
     rendererRef.current.resize(game.table.width, game.table.height);
   }, [game.table.height, game.table.width]);
 
-  // Scale canvas to fill available space
   useEffect(() => {
     const updateScale = (): void => {
       const container = containerRef.current;
@@ -245,22 +268,44 @@ function SharedGameCanvas({
         return;
       }
 
-      const availableWidth = Math.max(container.clientWidth - VIEWPORT_PADDING, 280);
-      const availableHeight = Math.max(container.clientHeight - VIEWPORT_PADDING, 220);
+      const computed = window.getComputedStyle(container);
+      const horizontalPadding =
+        Number.parseFloat(computed.paddingLeft) + Number.parseFloat(computed.paddingRight);
+      const verticalPadding =
+        Number.parseFloat(computed.paddingTop) + Number.parseFloat(computed.paddingBottom);
+
+      const availableWidth = Math.max(container.clientWidth - horizontalPadding, 260);
+      const availableHeight = Math.max(container.clientHeight - verticalPadding, 180);
       const nextScale = Math.min(availableWidth / TABLE_WIDTH, availableHeight / TABLE_HEIGHT, 1);
+
       setCanvasScale(nextScale);
     };
 
     updateScale();
+
+    const observer = new ResizeObserver(updateScale);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
     window.addEventListener('resize', updateScale);
     window.addEventListener('orientationchange', updateScale);
+    window.visualViewport?.addEventListener('resize', updateScale);
+
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', updateScale);
       window.removeEventListener('orientationchange', updateScale);
+      window.visualViewport?.removeEventListener('resize', updateScale);
     };
-  }, []);
+  }, [showHud, isCompactLandscape]);
 
-  // Render loop
+  useEffect(() => {
+    if (isCompactLandscape) {
+      setShowHud(false);
+    }
+  }, [isCompactLandscape]);
+
   useEffect(() => {
     let animationFrameId = 0;
 
@@ -292,7 +337,6 @@ function SharedGameCanvas({
     };
   }, []);
 
-  // Keyboard shortcut for HUD
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'h' || event.key === 'H') {
@@ -306,7 +350,6 @@ function SharedGameCanvas({
     };
   }, []);
 
-  // Convert pointer/touch position to table coordinates
   const getPointerPosition = useCallback(
     (clientX: number, clientY: number): Vector2 | null => {
       const rect = canvasRef.current?.getBoundingClientRect();
@@ -325,13 +368,16 @@ function SharedGameCanvas({
     [game.table.height, game.table.width]
   );
 
-  // Mouse handlers
-  const handleMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
-      if (multiplayer && !isMyTurn) return;
+  const updateInteraction = useCallback(
+    (clientX: number, clientY: number) => {
+      if (multiplayer && !isMyTurn) {
+        return;
+      }
 
-      const point = getPointerPosition(event.clientX, event.clientY);
-      if (!point) return;
+      const point = getPointerPosition(clientX, clientY);
+      if (!point) {
+        return;
+      }
 
       if (game.phase === 'aiming') {
         game.updateAim(point);
@@ -340,7 +386,10 @@ function SharedGameCanvas({
 
       if (game.phase === 'charging') {
         const whiteBall = game.balls.find(ball => ball.id === 'white');
-        if (!whiteBall) return;
+        if (!whiteBall) {
+          return;
+        }
+
         const dx = point.x - whiteBall.position.x;
         const dy = point.y - whiteBall.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -350,75 +399,60 @@ function SharedGameCanvas({
     [game, getPointerPosition, isMyTurn, multiplayer]
   );
 
-  const handleMouseDown = useCallback(() => {
-    if (multiplayer && !isMyTurn) return;
-    if (game.phase === 'aiming') {
-      game.startCharging();
-    }
-  }, [game, isMyTurn, multiplayer]);
-
-  const handleMouseUp = useCallback(() => {
-    if (multiplayer && !isMyTurn) return;
-    if (game.phase !== 'charging') return;
-
-    if (multiplayer && isMultiplayerGameView(game)) {
-      game.broadcastShot(game.cue.angle, game.cue.power, game.cue.spin);
-    }
-    game.shoot();
-  }, [game, isMyTurn, multiplayer]);
-
-  // Touch handlers
-  const handleTouchMove = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault();
-      if (multiplayer && !isMyTurn) return;
+      updateInteraction(event.clientX, event.clientY);
+    },
+    [updateInteraction]
+  );
 
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      const point = getPointerPosition(touch.clientX, touch.clientY);
-      if (!point) return;
-
-      if (game.phase === 'aiming') {
-        game.updateAim(point);
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
+      if (multiplayer && !isMyTurn) {
         return;
       }
 
-      if (game.phase === 'charging') {
-        const whiteBall = game.balls.find(ball => ball.id === 'white');
-        if (!whiteBall) return;
-        const dx = point.x - whiteBall.position.x;
-        const dy = point.y - whiteBall.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        game.updatePower(Math.min(100, Math.max(10, distance * 0.55)));
-      }
-    },
-    [game, getPointerPosition, isMyTurn, multiplayer]
-  );
+      event.currentTarget.setPointerCapture(event.pointerId);
+      updateInteraction(event.clientX, event.clientY);
 
-  const handleTouchStart = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
-      event.preventDefault();
-      if (multiplayer && !isMyTurn) return;
       if (game.phase === 'aiming') {
         game.startCharging();
       }
     },
-    [game, isMyTurn, multiplayer]
+    [game, isMyTurn, multiplayer, updateInteraction]
   );
 
-  const handleTouchEnd = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
-      event.preventDefault();
-      if (multiplayer && !isMyTurn) return;
-      if (game.phase !== 'charging') return;
+  const finishShot = useCallback(() => {
+    if (multiplayer && !isMyTurn) {
+      return;
+    }
+    if (game.phase !== 'charging') {
+      return;
+    }
 
-      if (multiplayer && isMultiplayerGameView(game)) {
-        game.broadcastShot(game.cue.angle, game.cue.power, game.cue.spin);
-      }
-      game.shoot();
+    if (multiplayer && isMultiplayerGameView(game)) {
+      game.broadcastShot(game.cue.angle, game.cue.power, game.cue.spin);
+    }
+
+    game.shoot();
+  }, [game, isMyTurn, multiplayer]);
+
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
+      finishShot();
     },
-    [game, isMyTurn, multiplayer]
+    [finishShot]
+  );
+
+  const handlePointerCancel = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
+      finishShot();
+    },
+    [finishShot]
   );
 
   const tableCardStyle = useMemo(
@@ -430,24 +464,24 @@ function SharedGameCanvas({
     [canvasScale]
   );
 
-  // Portrait warning overlay
   if (isPortrait) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0f] text-white">
-        <div className="text-5xl">↻</div>
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#0a0a0f] px-6 text-white">
+        <div className="text-5xl">Rotate</div>
         <p className="mt-4 text-center text-sm text-white/60">
-          Rotate your device to landscape<br />to play
+          Gire o dispositivo para o modo horizontal
+          <br />
+          para ver a mesa inteira
         </p>
       </div>
     );
   }
 
   return (
-    <main className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
-      {/* Minimal header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
-        <h1 className="text-sm font-semibold text-white/80 md:text-lg">
-          {multiplayer ? `Room · P${playerNumber}` : 'Bool Eight'}
+    <main className="game-shell flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0f] text-white">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
+        <h1 className="truncate text-sm font-semibold text-white/80 md:text-lg">
+          {multiplayer ? `Room - P${playerNumber}` : 'Bool Eight'}
         </h1>
         <div className="flex items-center gap-2">
           <Link
@@ -466,33 +500,34 @@ function SharedGameCanvas({
         </div>
       </header>
 
-      {/* Game area */}
-      <section className="game-container relative flex flex-1 overflow-hidden">
-        {/* Canvas container - responsivo universal */}
+      <section
+        className={`game-layout relative flex flex-1 overflow-hidden ${
+          isCompactLandscape ? 'pb-14' : ''
+        }`}
+      >
         <div
           ref={containerRef}
-          className="game-canvas-wrapper flex flex-1 items-center justify-center overflow-hidden p-2"
+          className={`game-stage flex flex-1 items-center justify-center overflow-hidden ${
+            showHud && !isCompactLandscape ? 'pr-2 md:pr-[304px]' : ''
+          }`}
         >
           <div
-            className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+            className="game-table-frame overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
             style={tableCardStyle}
           >
             <canvas
               ref={canvasRef}
               width={TABLE_WIDTH}
               height={TABLE_HEIGHT}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onTouchMove={handleTouchMove}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              className="game-canvas block h-full w-full cursor-crosshair touch-none"
+              onPointerMove={handlePointerMove}
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              className="game-canvas block h-full w-full cursor-crosshair"
             />
           </div>
         </div>
 
-        {/* HUD */}
         {showHud ? (
           <HudPanel
             game={game}
@@ -500,14 +535,19 @@ function SharedGameCanvas({
             multiplayer={multiplayer}
             recentEvents={recentEvents}
             onHide={() => setShowHud(false)}
+            compact={isCompactLandscape}
           />
         ) : (
           <button
             type="button"
             onClick={() => setShowHud(true)}
-            className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-[11px] text-white/40 backdrop-blur md:bottom-4 md:left-1/2 md:right-auto md:-translate-x-1/2"
+            className={`absolute rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] text-white/60 backdrop-blur ${
+              isCompactLandscape
+                ? 'bottom-2 left-1/2 z-20 -translate-x-1/2'
+                : 'bottom-3 right-3 z-20 md:bottom-4 md:left-1/2 md:right-auto md:-translate-x-1/2'
+            }`}
           >
-            Tap for controls
+            Controles
           </button>
         )}
       </section>
@@ -521,17 +561,27 @@ function HudPanel({
   multiplayer,
   recentEvents,
   onHide,
+  compact = false,
 }: {
   game: GameStoreView;
   isMyTurn: boolean;
   multiplayer: boolean;
   recentEvents: Array<{ type: string }>;
   onHide: () => void;
+  compact?: boolean;
 }): JSX.Element {
   return (
-    <aside className="hud-overlay absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
+    <aside
+      className={`hud-overlay border border-white/10 bg-black/78 backdrop-blur-md ${
+        compact
+          ? 'absolute inset-x-2 bottom-2 z-20 rounded-2xl p-3'
+          : 'absolute right-2 top-2 z-20 w-[200px] rounded-2xl p-3 sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4'
+      }`}
+    >
       <div className="flex items-center justify-between">
-        <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">Match</h2>
+        <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">
+          Match
+        </h2>
         <button
           type="button"
           onClick={onHide}
@@ -546,7 +596,11 @@ function HudPanel({
         <ScoreCard label="P2" value={game.scores.p2} accent="text-pink-400" />
       </div>
 
-      <div className="mt-3 space-y-1.5 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+      <div
+        className={`mt-3 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs ${
+          compact ? 'grid grid-cols-3 gap-2' : 'space-y-1.5'
+        }`}
+      >
         <StatusRow
           label="Turn"
           value={`P${game.currentPlayer}`}
@@ -575,30 +629,32 @@ function HudPanel({
         </div>
       </div>
 
-      <div className="mt-3 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
-        <p className="font-medium text-white/90">
-          {game.lastShotValid ? 'Last shot: valid' : 'Last shot: foul'}
-        </p>
-        {game.fouls.length > 0 ? (
-          <ul className="mt-1.5 space-y-1 text-rose-300">
-            {game.fouls.map(foul => (
-              <li key={foul}>{foul}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-1.5 text-white/45">No fouls on latest turn.</p>
-        )}
-      </div>
-
-      <div className="mt-3 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
-        <p className="font-medium text-white/90">Recent events</p>
-        <ul className="mt-1.5 space-y-1 text-white/45">
-          {recentEvents.length > 0 ? (
-            recentEvents.map((event, index) => <li key={`${event.type}-${index}`}>{event.type}</li>)
+      <div className={`mt-3 gap-3 ${compact ? 'grid grid-cols-2' : ''}`}>
+        <div className="rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+          <p className="font-medium text-white/90">
+            {game.lastShotValid ? 'Last shot: valid' : 'Last shot: foul'}
+          </p>
+          {game.fouls.length > 0 ? (
+            <ul className="mt-1.5 space-y-1 text-rose-300">
+              {game.fouls.map(foul => (
+                <li key={foul}>{foul}</li>
+              ))}
+            </ul>
           ) : (
-            <li>No events yet.</li>
+            <p className="mt-1.5 text-white/45">No fouls on latest turn.</p>
           )}
-        </ul>
+        </div>
+
+        <div className="rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+          <p className="font-medium text-white/90">Recent events</p>
+          <ul className="mt-1.5 space-y-1 text-white/45">
+            {recentEvents.length > 0 ? (
+              recentEvents.map((event, index) => <li key={`${event.type}-${index}`}>{event.type}</li>)
+            ) : (
+              <li>No events yet.</li>
+            )}
+          </ul>
+        </div>
       </div>
     </aside>
   );
@@ -631,7 +687,7 @@ function StatusRow({
   accent?: string;
 }): JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className={`${label === 'Phase' ? 'min-w-0' : ''} flex items-center justify-between gap-2`}>
       <span className="text-white/45">{label}</span>
       <span className={`min-w-0 text-right capitalize ${accent ?? 'text-white'}`}>{value}</span>
     </div>

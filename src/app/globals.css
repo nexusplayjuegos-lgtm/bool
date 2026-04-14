@@ -28,20 +28,17 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
+canvas {
+  image-rendering: auto;
+  touch-action: none;
+}
+
 button:focus-visible,
 a:focus-visible {
   outline: 2px solid rgba(16, 185, 129, 0.8);
   outline-offset: 3px;
 }
 
-/* Canvas optimizations */
-canvas {
-  image-rendering: optimizeSpeed;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: -webkit-optimize-contrast;
-}
-
-/* Fullscreen styles */
 :fullscreen,
 :-webkit-full-screen,
 :-moz-full-screen,
@@ -49,74 +46,39 @@ canvas {
   background: #0a0a0f;
 }
 
-/* ============================================
-   MESA DENTRO DO RETÂNGULO ÚTIL
-   Canvas interno limitado, não o container externo
-   ============================================ */
+.game-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.game-layout {
+  min-height: 0;
+}
+
+.game-stage {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+}
+
+.game-table-frame {
+  flex: 0 0 auto;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 
 @media (max-width: 1024px) {
-  /* Container externo: preto, 100% da tela */
-  .game-container {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background: #0a0a0f;
-  }
-
-  /* Canvas interno: a MESA VERDE - limitada ao retângulo útil */
-  .game-canvas {
-    /* Máximo 90% da largura, máximo 45% da altura (ratio 2:1) */
-    width: min(90vw, calc(90vh * 2)) !important;
-    height: min(45vw, 90vh) !important;
-
-    /* Nunca ultrapassar a tela */
-    max-width: 90vw !important;
-    max-height: 90vh !important;
-
-    /* Centralizado */
-    margin: auto;
-
-    touch-action: manipulation;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-
-  /* HUD flutuante */
-  .hud-overlay {
-    position: absolute;
-    right: 8px;
-    top: 8px;
-    width: min(200px, 30vw);
-    z-index: 100;
-    background: rgba(0,0,0,0.8);
-    border-radius: 8px;
-    padding: 8px;
-    font-size: clamp(10px, 2vw, 14px);
-  }
-}
-
-/* Forçar ratio 2:1 mesmo em telas estranhas */
-@supports (aspect-ratio: 2/1) {
-  @media (max-width: 1024px) {
-    .game-canvas {
-      aspect-ratio: 2/1;
-      width: min(90vw, calc(90vh * 2)) !important;
-      height: auto !important;
-      max-height: 90vh !important;
-    }
-  }
-}
-
-/* iOS específico: safe areas */
-@supports (-webkit-touch-callout: none) {
-  @media (max-width: 1024px) {
-    .game-container {
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-    }
+  .game-stage {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
   }
 }
