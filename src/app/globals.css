@@ -90,10 +90,34 @@ canvas {
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Fullscreen styles */
+/* Fullscreen styles - hide browser UI */
 :fullscreen,
 :-webkit-full-screen,
 :-moz-full-screen,
 :-ms-fullscreen {
   background: #0a0a0f;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:fullscreen html,
+:fullscreen body,
+:-webkit-full-screen html,
+:-webkit-full-screen body {
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+/* Hide address bar on mobile */
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  width: 100%;
+  position: fixed;
+  overflow: hidden;
 }

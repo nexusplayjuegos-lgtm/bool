@@ -36,13 +36,16 @@ export function GameUI({
     if (hideTimeout) clearTimeout(hideTimeout);
     const timeout = setTimeout(() => {
       setShowControls(false);
-    }, 3000);
+    }, 4000);
     setHideTimeout(timeout);
   }, [hideTimeout]);
 
-  const handleShowControls = () => {
-    setShowControls(true);
-    scheduleHide();
+  const toggleControls = () => {
+    setShowControls(prev => {
+      const next = !prev;
+      if (next) scheduleHide();
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -55,35 +58,28 @@ export function GameUI({
 
   return (
     <>
-      {/* Tap area to show controls */}
-      <div
-        className="absolute inset-0 z-10"
-        onClick={handleShowControls}
-        onTouchStart={handleShowControls}
-      />
-
       {/* Top bar - always visible */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex items-center justify-between p-3">
+        {/* Mode name */}
         <div className="pointer-events-auto rounded-lg bg-black/60 px-3 py-1.5 backdrop-blur-sm">
           <span className="text-[10px] uppercase tracking-wider text-white/50">{modeName}</span>
         </div>
 
-        {isFullscreen && (
-          <button
-            onClick={onToggleFullscreen}
-            className="pointer-events-auto rounded-lg bg-black/60 p-2 text-white/70 backdrop-blur-sm transition hover:bg-black/80 hover:text-white"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
+        {/* Menu button - opens controls */}
+        <button
+          onClick={toggleControls}
+          className="pointer-events-auto rounded-lg bg-black/60 p-2 text-white/70 backdrop-blur-sm transition hover:bg-black/80 hover:text-white"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
       </div>
 
-      {/* Controls overlay */}
+      {/* Controls overlay - only when active */}
       {showControls && (
         <div
-          className="absolute inset-0 z-30 flex flex-col bg-black/40 backdrop-blur-sm"
+          className="absolute inset-0 z-30 flex flex-col bg-black/60 backdrop-blur-sm"
           onClick={() => setShowControls(false)}
         >
           {/* Top controls */}
@@ -109,14 +105,26 @@ export function GameUI({
                 ⛶ Fullscreen
               </button>
             )}
+
+            {isFullscreen && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFullscreen();
+                }}
+                className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/20"
+              >
+                ⛶ Exit
+              </button>
+            )}
           </div>
 
-          {/* Center - empty for game view */}
+          {/* Center - closes controls */}
           <div className="flex-1" onClick={() => setShowControls(false)} />
 
           {/* Bottom HUD */}
           <div
-            className="mx-auto mb-4 w-full max-w-md rounded-2xl bg-black/70 p-4 backdrop-blur-md"
+            className="mx-auto mb-4 w-full max-w-md rounded-2xl bg-black/80 p-4 backdrop-blur-md"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Scores */}
@@ -160,25 +168,23 @@ export function GameUI({
         </div>
       )}
 
-      {/* Minimal HUD when not showing controls */}
-      {!showControls && (
-        <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between">
-          {/* Score mini */}
-          <div className="flex gap-2">
-            <div className={`rounded-lg px-2 py-1 text-sm font-bold ${currentPlayer === 1 ? 'bg-blue-500/40 text-blue-200' : 'bg-white/10 text-white/60'}`}>
-              P1: {scores.p1}
-            </div>
-            <div className={`rounded-lg px-2 py-1 text-sm font-bold ${currentPlayer === 2 ? 'bg-pink-500/40 text-pink-200' : 'bg-white/10 text-white/60'}`}>
-              P2: {scores.p2}
-            </div>
+      {/* Minimal HUD - always visible, doesn't block game */}
+      <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between">
+        {/* Score mini */}
+        <div className="flex gap-2">
+          <div className={`rounded-lg px-2 py-1 text-sm font-bold ${currentPlayer === 1 ? 'bg-blue-500/40 text-blue-200' : 'bg-white/10 text-white/60'}`}>
+            P1: {scores.p1}
           </div>
-
-          {/* Tap hint */}
-          <div className="rounded-lg bg-black/40 px-2 py-1 text-[10px] text-white/40">
-            Tap for controls
+          <div className={`rounded-lg px-2 py-1 text-sm font-bold ${currentPlayer === 2 ? 'bg-pink-500/40 text-pink-200' : 'bg-white/10 text-white/60'}`}>
+            P2: {scores.p2}
           </div>
         </div>
-      )}
+
+        {/* Phase indicator */}
+        <div className="rounded-lg bg-black/40 px-2 py-1 text-[10px] text-white/40 capitalize">
+          {phase}
+        </div>
+      </div>
     </>
   );
 }
