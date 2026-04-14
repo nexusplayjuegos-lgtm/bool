@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 
 interface UseAutoFullscreenOptions {
   enabled?: boolean;
+  autoEnterOnLandscape?: boolean;
   onOrientationChange?: (isLandscape: boolean) => void;
 }
 
 export function useAutoFullscreen(options: UseAutoFullscreenOptions = {}) {
-  const { enabled = true, onOrientationChange } = options;
+  const { enabled = true, autoEnterOnLandscape = true, onOrientationChange } = options;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
 
@@ -33,16 +34,19 @@ export function useAutoFullscreen(options: UseAutoFullscreenOptions = {}) {
       };
 
       const elem = document.documentElement as HTMLElement & {
-        webkitRequestFullscreen?: () => Promise<void>;
+        webkitRequestFullscreen?: (options?: { navigationUI?: 'hide' | 'show' }) => Promise<void>;
         mozRequestFullScreen?: () => Promise<void>;
         msRequestFullscreen?: () => Promise<void>;
       };
 
       if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+        // Try to hide navigation UI
+        const fullscreenOptions = { navigationUI: 'hide' as const };
+        
         if (elem.requestFullscreen) {
-          await elem.requestFullscreen();
+          await elem.requestFullscreen(fullscreenOptions);
         } else if (elem.webkitRequestFullscreen) {
-          await elem.webkitRequestFullscreen();
+          await elem.webkitRequestFullscreen(fullscreenOptions);
         } else if (elem.mozRequestFullScreen) {
           await elem.mozRequestFullScreen();
         } else if (elem.msRequestFullscreen) {
@@ -101,9 +105,11 @@ export function useAutoFullscreen(options: UseAutoFullscreenOptions = {}) {
       const landscape = checkOrientation();
 
       // Auto-enter fullscreen when landscape on mobile
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile && landscape && !isFullscreen) {
-        enterFullscreen();
+      if (autoEnterOnLandscape) {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile && landscape && !isFullscreen) {
+          enterFullscreen();
+        }
       }
     };
 
@@ -134,7 +140,7 @@ export function useAutoFullscreen(options: UseAutoFullscreenOptions = {}) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, [enabled, isFullscreen, checkOrientation, enterFullscreen]);
+  }, [enabled, autoEnterOnLandscape, isFullscreen, checkOrientation, enterFullscreen]);
 
   return {
     isFullscreen,

@@ -216,8 +216,21 @@ function GamePageContent(): JSX.Element {
     [gameStore]
   );
 
+  // Check if portrait on mobile
+  const isPortraitMobile = viewport.width < 768 && viewport.width < viewport.height;
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a0f]">
+      {/* Portrait warning - only on mobile portrait */}
+      {isPortraitMobile && (
+        <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0a0a0f]">
+          <div className="animate-spin text-6xl text-emerald-500">↻</div>
+          <p className="mt-4 text-center text-sm text-white/60">
+            Rotate your device<br />to play
+          </p>
+        </div>
+      )}
+
       {/* Canvas - fills entire screen */}
       <canvas
         ref={canvasRef}

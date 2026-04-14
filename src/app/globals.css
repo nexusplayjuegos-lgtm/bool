@@ -34,55 +34,6 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
-/* Portrait warning - simplified and centered */
-@media screen and (max-width: 600px) and (orientation: portrait) {
-  body {
-    overflow: hidden !important;
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: #0a0a0f;
-    z-index: 99999;
-  }
-
-  body::after {
-    content: "↻";
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #22c55e;
-    font-size: 5rem;
-    z-index: 99999;
-    animation: rotateIcon 2s ease-in-out infinite;
-  }
-}
-
-@keyframes rotateIcon {
-  0%, 100% {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
-}
-
-/* Hide portrait warning in landscape */
-@media screen and (orientation: landscape) {
-  body::before,
-  body::after {
-    display: none !important;
-  }
-}
-
-/* Prevent pull-to-refresh on mobile */
-body {
-  overscroll-behavior: none;
-}
-
 /* Canvas optimizations */
 canvas {
   image-rendering: optimizeSpeed;
@@ -90,34 +41,10 @@ canvas {
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Fullscreen styles - hide browser UI */
+/* Fullscreen styles */
 :fullscreen,
 :-webkit-full-screen,
 :-moz-full-screen,
 :-ms-fullscreen {
   background: #0a0a0f;
-  width: 100vw !important;
-  height: 100vh !important;
-}
-
-:fullscreen html,
-:fullscreen body,
-:-webkit-full-screen html,
-:-webkit-full-screen body {
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-}
-
-/* Hide address bar on mobile */
-html {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
-  height: 100%;
-  width: 100%;
-  position: fixed;
-  overflow: hidden;
 }
