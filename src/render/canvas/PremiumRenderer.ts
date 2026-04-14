@@ -415,6 +415,32 @@ export class PremiumRenderer {
     this.config = { width, height };
     this.dpr = window.devicePixelRatio || 1;
     this.applyCanvasSize();
+
+    // ARQUITETO: Recriar layers se necessário (switch implícito)
+    if (USE_LAYER_MANAGER && this.container && this.layerManager) {
+      this.container.innerHTML = '';
+      this.layerManager = new LayerManager(this.container, width, height);
+
+      this.tableCtx = this.layerManager.createLayer({
+        name: 'table',
+        zIndex: 0,
+        isStatic: true
+      });
+
+      this.ballsCtx = this.layerManager.createLayer({
+        name: 'balls',
+        zIndex: 1,
+        isStatic: false
+      });
+
+      this.uiCtx = this.layerManager.createLayer({
+        name: 'ui',
+        zIndex: 2,
+        isStatic: false
+      });
+
+      this.tableRendered = false;
+    }
   }
 
   // ARQUITETO: Renderização com layers - Fase 2
