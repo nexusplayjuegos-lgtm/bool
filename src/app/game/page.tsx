@@ -182,6 +182,34 @@ function SharedGameCanvas({
     };
   }, []);
 
+  // Fullscreen mobile
+  useEffect(() => {
+    const enterFullscreen = () => {
+      // Scroll para esconder barra de endereço em iOS
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        window.scrollTo(0, 1);
+      }
+      // Tentar fullscreen API
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+      // Lock orientação landscape
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orientation = (screen as any).orientation;
+      if (orientation?.lock) {
+        orientation.lock('landscape').catch(() => {});
+      }
+    };
+
+    // Entrar fullscreen ao carregar
+    setTimeout(enterFullscreen, 100);
+
+    // Re-entrar ao mudar orientação
+    window.addEventListener('orientationchange', enterFullscreen);
+
+    return () => window.removeEventListener('orientationchange', enterFullscreen);
+  }, []);
+
   useEffect(() => {
     if (!canvasRef.current) {
       return;
@@ -429,10 +457,10 @@ function SharedGameCanvas({
 
       {/* Game area */}
       <section className="relative flex flex-1 overflow-hidden">
-        {/* Canvas container */}
+        {/* Canvas container - responsivo */}
         <div
           ref={containerRef}
-          className="game-container-mobile flex flex-1 items-center justify-center overflow-hidden p-2"
+          className="game-container-mobile game-canvas-container flex flex-1 items-center justify-center overflow-hidden p-2"
         >
           <div
             className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
@@ -449,7 +477,6 @@ function SharedGameCanvas({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               className="game-canvas block h-full w-full cursor-crosshair touch-none"
-              style={{ width: '100%', height: '100%', touchAction: 'none' }}
             />
           </div>
         </div>
