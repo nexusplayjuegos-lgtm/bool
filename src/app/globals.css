@@ -13,10 +13,14 @@
 
 html {
   scroll-behavior: smooth;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
+  height: 100%;
   min-height: 100vh;
+  overflow: hidden;
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-geist-sans), sans-serif;

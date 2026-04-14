@@ -14,6 +14,8 @@ import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
 const TABLE_WIDTH = 1200;
 const TABLE_HEIGHT = 600;
 const MOBILE_SHORT_HEIGHT = 540;
+const MOBILE_TABLE_SCALE = 0.78;
+const MOBILE_SIDE_HUD_WIDTH = 220;
 
 type PlayerNumber = 1 | 2;
 
@@ -160,6 +162,7 @@ function SharedGameCanvas({
   const rendererRef = useRef<PremiumRenderer | null>(null);
   const latestGameRef = useRef<GameStoreView>(game);
   const resizeFrameRef = useRef<number | null>(null);
+  const orientationTimeoutRef = useRef<number | null>(null);
   const [showHud, setShowHud] = useState(true);
   const [canvasScale, setCanvasScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -173,6 +176,7 @@ function SharedGameCanvas({
     () => !isPortrait && viewportSize.height <= MOBILE_SHORT_HEIGHT,
     [isPortrait, viewportSize.height]
   );
+  const isMobileViewport = viewportSize.width <= 1024;
 
   useEffect(() => {
     const syncViewport = (): void => {
@@ -203,12 +207,30 @@ function SharedGameCanvas({
     window.visualViewport?.addEventListener('resize', scheduleSync);
     window.visualViewport?.addEventListener('scroll', scheduleSync);
 
+    const handleOrientationRefresh = (): void => {
+      scheduleSync();
+      if (orientationTimeoutRef.current !== null) {
+        window.clearTimeout(orientationTimeoutRef.current);
+      }
+
+      orientationTimeoutRef.current = window.setTimeout(() => {
+        window.scrollTo(0, 1);
+        scheduleSync();
+      }, 280);
+    };
+
+    window.addEventListener('orientationchange', handleOrientationRefresh);
+
     return () => {
       if (resizeFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeFrameRef.current);
       }
+      if (orientationTimeoutRef.current !== null) {
+        window.clearTimeout(orientationTimeoutRef.current);
+      }
       window.removeEventListener('resize', scheduleSync);
       window.removeEventListener('orientationchange', scheduleSync);
+      window.removeEventListener('orientationchange', handleOrientationRefresh);
       window.visualViewport?.removeEventListener('resize', scheduleSync);
       window.visualViewport?.removeEventListener('scroll', scheduleSync);
     };
@@ -274,9 +296,13 @@ function SharedGameCanvas({
       const verticalPadding =
         Number.parseFloat(computed.paddingTop) + Number.parseFloat(computed.paddingBottom);
 
-      const availableWidth = Math.max(container.clientWidth - horizontalPadding, 260);
-      const availableHeight = Math.max(container.clientHeight - verticalPadding, 180);
-      const nextScale = Math.min(availableWidth / TABLE_WIDTH, availableHeight / TABLE_HEIGHT, 1);
+      const sideHudOffset =
+        showHud && !isCompactLandscape && isMobileViewport ? MOBILE_SIDE_HUD_WIDTH : 0;
+      const widthBudget = Math.max(container.clientWidth - horizontalPadding - sideHudOffset, 220);
+      const heightBudget = Math.max(container.clientHeight - verticalPadding, 160);
+      const baseScale = Math.min(widthBudget / TABLE_WIDTH, heightBudget / TABLE_HEIGHT, 1);
+      const nextScale =
+        isMobileViewport && !isPortrait ? baseScale * MOBILE_TABLE_SCALE : baseScale;
 
       setCanvasScale(nextScale);
     };
@@ -298,7 +324,24 @@ function SharedGameCanvas({
       window.removeEventListener('orientationchange', updateScale);
       window.visualViewport?.removeEventListener('resize', updateScale);
     };
-  }, [showHud, isCompactLandscape]);
+  }, [isCompactLandscape, isMobileViewport, isPortrait, showHud]);
+
+  useEffect(() => {
+    const hideBrowserChrome = (): void => {
+      window.scrollTo(0, 1);
+    };
+
+    hideBrowserChrome();
+    window.addEventListener('load', hideBrowserChrome);
+    window.addEventListener('resize', hideBrowserChrome);
+    window.addEventListener('orientationchange', hideBrowserChrome);
+
+    return () => {
+      window.removeEventListener('load', hideBrowserChrome);
+      window.removeEventListener('resize', hideBrowserChrome);
+      window.removeEventListener('orientationchange', hideBrowserChrome);
+    };
+  }, []);
 
   useEffect(() => {
     if (isCompactLandscape) {
@@ -508,7 +551,11 @@ function SharedGameCanvas({
         <div
           ref={containerRef}
           className={`game-stage flex flex-1 items-center justify-center overflow-hidden ${
-            showHud && !isCompactLandscape ? 'pr-2 md:pr-[304px]' : ''
+            showHud && !isCompactLandscape
+              ? isMobileViewport
+                ? 'pr-2'
+                : 'pr-2 md:pr-[304px]'
+              : ''
           }`}
         >
           <div
