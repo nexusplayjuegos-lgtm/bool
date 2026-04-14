@@ -417,6 +417,32 @@ export class PremiumRenderer {
     this.applyCanvasSize();
   }
 
+  // ARQUITETO: Renderização com layers - Fase 2
+  renderWithLayers(table: Table, balls: Ball[], cue: Cue, phase: GamePhase, whiteBallPos: Vector2): void {
+    if (!this.layerManager || !this.tableCtx || !this.ballsCtx || !this.uiCtx) return;
+
+    // Layer 0: Mesa (apenas 1x)
+    if (!this.tableRendered) {
+      this.renderTableToContext(table, this.tableCtx);
+      this.tableRendered = true;
+    }
+
+    // Layer 1: Bolas (limpar e redesenhar)
+    this.layerManager.clearLayer('balls');
+    balls.forEach(ball => {
+      this.renderBallToContext(ball, this.ballsCtx!);
+    });
+
+    // Layer 2: UI/Taco (limpar e redesenhar)
+    this.layerManager.clearLayer('ui');
+    this.renderCueToContext(cue, phase, whiteBallPos, this.uiCtx!);
+  }
+
+  // ARQUITETO: Verificar se está usando layers
+  isUsingLayers(): boolean {
+    return USE_LAYER_MANAGER && !!this.layerManager;
+  }
+
   private applyCanvasSize(): void {
     this.canvas.width = this.config.width * this.dpr;
     this.canvas.height = this.config.height * this.dpr;
@@ -424,6 +450,28 @@ export class PremiumRenderer {
     this.canvas.style.height = `${this.config.height}px`;
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.dpr, this.dpr);
+  }
+
+  // ARQUITETO: Métodos de renderização para contexto específico (LayerManager)
+  private renderTableToContext(table: Table, targetCtx: CanvasRenderingContext2D): void {
+    const originalCtx = this.ctx;
+    this.ctx = targetCtx;
+    this.renderTable(table);
+    this.ctx = originalCtx;
+  }
+
+  private renderBallToContext(ball: Ball, targetCtx: CanvasRenderingContext2D): void {
+    const originalCtx = this.ctx;
+    this.ctx = targetCtx;
+    this.renderBall(ball);
+    this.ctx = originalCtx;
+  }
+
+  private renderCueToContext(cue: Cue, phase: GamePhase, whiteBallPos: Vector2, targetCtx: CanvasRenderingContext2D): void {
+    const originalCtx = this.ctx;
+    this.ctx = targetCtx;
+    this.renderCue(cue, phase, whiteBallPos);
+    this.ctx = originalCtx;
   }
 
   private renderPremiumPockets(pockets: Table['pockets']): void {
