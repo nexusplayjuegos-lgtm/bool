@@ -1,4 +1,10 @@
 import { Ball, Cue, GamePhase, Table, Vector2 } from '@/engine/types';
+import { LayerManager } from './LayerManager';
+
+// ARQUITETO: Feature flag para Canvas Layering Fase 2
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const USE_LAYER_MANAGER = false; // Iniciar desligado, ativar após testes
+void USE_LAYER_MANAGER; // Suprimir warning de variável não utilizada
 
 interface RenderConfig {
   width: number;
@@ -109,6 +115,14 @@ export class PremiumRenderer {
   private dpr: number;
   private canvas: HTMLCanvasElement;
 
+  // ARQUITETO: Integração LayerManager - Fase 2
+  private layerManager?: LayerManager;
+  private tableCtx?: CanvasRenderingContext2D;
+  private ballsCtx?: CanvasRenderingContext2D;
+  private uiCtx?: CanvasRenderingContext2D;
+  private tableRendered = false;
+  private container?: HTMLElement;
+
   constructor(canvas: HTMLCanvasElement, config: RenderConfig) {
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -121,6 +135,43 @@ export class PremiumRenderer {
     this.dpr = window.devicePixelRatio || 1;
 
     this.applyCanvasSize();
+
+    // ARQUITETO: Inicialização condicional do LayerManager
+    if (USE_LAYER_MANAGER && canvas.parentElement) {
+      this.container = canvas.parentElement;
+      this.layerManager = new LayerManager(this.container, config.width, config.height);
+
+      // Layer 0: Mesa estática
+      this.tableCtx = this.layerManager.createLayer({
+        name: 'table',
+        zIndex: 0,
+        isStatic: true
+      });
+
+      // Layer 1: Bolas dinâmicas
+      this.ballsCtx = this.layerManager.createLayer({
+        name: 'balls',
+        zIndex: 1,
+        isStatic: false
+      });
+
+      // Layer 2: UI/Taco
+      this.uiCtx = this.layerManager.createLayer({
+        name: 'ui',
+        zIndex: 2,
+        isStatic: false
+      });
+
+      // Esconder canvas original quando usando layers
+      canvas.style.display = 'none';
+    }
+
+    // Suprimir warnings de variáveis não utilizadas (serão usadas nos próximos commits)
+    void this.tableCtx;
+    void this.ballsCtx;
+    void this.uiCtx;
+    void this.tableRendered;
+    void this.container;
   }
 
   clear(): void {
