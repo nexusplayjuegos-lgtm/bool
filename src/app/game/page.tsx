@@ -13,7 +13,8 @@ import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
 
 const TABLE_WIDTH = 1200;
 const TABLE_HEIGHT = 600;
-const VIEWPORT_PADDING = 16;
+const VIEWPORT_PADDING_DESKTOP = 16;
+const VIEWPORT_PADDING_MOBILE = 4;
 
 type PlayerNumber = 1 | 2;
 
@@ -206,8 +207,12 @@ function SharedGameCanvas({
         return;
       }
 
-      const availableWidth = Math.max(container.clientWidth - VIEWPORT_PADDING, 280);
-      const availableHeight = Math.max(container.clientHeight - VIEWPORT_PADDING, 220);
+      // Mobile detection for padding optimization
+      const isMobile = window.innerWidth < 768;
+      const padding = isMobile ? VIEWPORT_PADDING_MOBILE : VIEWPORT_PADDING_DESKTOP;
+
+      const availableWidth = Math.max(container.clientWidth - padding * 2, 280);
+      const availableHeight = Math.max(container.clientHeight - padding * 2, 220);
       const nextScale = Math.min(availableWidth / TABLE_WIDTH, availableHeight / TABLE_HEIGHT, 1);
       setCanvasScale(nextScale);
     };
@@ -429,10 +434,10 @@ function SharedGameCanvas({
 
       {/* Game area */}
       <section className="relative flex flex-1 overflow-hidden">
-        {/* Canvas container */}
+        {/* Canvas container - mobile-optimized padding */}
         <div
           ref={containerRef}
-          className="flex flex-1 items-center justify-center overflow-hidden p-2"
+          className="flex flex-1 items-center justify-center overflow-hidden p-0.5 sm:p-1 md:p-2"
         >
           <div
             className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
@@ -491,24 +496,24 @@ function HudPanel({
   onHide: () => void;
 }): JSX.Element {
   return (
-    <aside className="absolute right-2 top-2 w-[200px] rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur-md sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4">
+    <aside className="absolute right-1 top-1 w-[160px] rounded-xl border border-white/10 bg-black/80 p-2 backdrop-blur-md sm:right-2 sm:top-2 sm:w-[200px] sm:p-3 md:right-6 md:top-6 md:w-[290px] md:rounded-2xl md:p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/55 md:text-xs">Match</h2>
+        <h2 className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/55 sm:text-[10px] md:text-xs">Match</h2>
         <button
           type="button"
           onClick={onHide}
-          className="text-[10px] text-white/50 transition hover:text-white md:text-xs"
+          className="text-[9px] text-white/50 transition hover:text-white sm:text-[10px] md:text-xs"
         >
-          [H] hide
+          <span className="hidden sm:inline">[H] </span>hide
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-2">
         <ScoreCard label="P1" value={game.scores.p1} accent="text-blue-400" />
         <ScoreCard label="P2" value={game.scores.p2} accent="text-pink-400" />
       </div>
 
-      <div className="mt-3 space-y-1.5 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+      <div className="mt-2 space-y-1 rounded-lg bg-white/5 p-1.5 text-[10px] sm:mt-3 sm:space-y-1.5 sm:rounded-xl sm:p-2.5 sm:text-[11px] md:text-xs">
         <StatusRow
           label="Turn"
           value={`P${game.currentPlayer}`}
@@ -524,12 +529,12 @@ function HudPanel({
         ) : null}
       </div>
 
-      <div className="mt-3 rounded-xl bg-white/5 p-2.5">
-        <div className="mb-1.5 flex items-center justify-between text-[10px] text-white/55 md:text-xs">
+      <div className="mt-2 rounded-lg bg-white/5 p-1.5 sm:mt-3 sm:rounded-xl sm:p-2.5">
+        <div className="mb-1 flex items-center justify-between text-[9px] text-white/55 sm:mb-1.5 sm:text-[10px] md:text-xs">
           <span>Power</span>
           <span>{Math.round(game.cue.power)}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/10 md:h-2">
+        <div className="h-1 overflow-hidden rounded-full bg-white/10 sm:h-1.5 md:h-2">
           <div
             className="h-full bg-[linear-gradient(90deg,#22c55e,#eab308,#dc2626)] transition-all duration-75"
             style={{ width: `${game.cue.power}%` }}
@@ -537,24 +542,24 @@ function HudPanel({
         </div>
       </div>
 
-      <div className="mt-3 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+      <div className="mt-2 rounded-lg bg-white/5 p-1.5 text-[10px] sm:mt-3 sm:rounded-xl sm:p-2.5 sm:text-[11px] md:text-xs">
         <p className="font-medium text-white/90">
           {game.lastShotValid ? 'Last shot: valid' : 'Last shot: foul'}
         </p>
         {game.fouls.length > 0 ? (
-          <ul className="mt-1.5 space-y-1 text-rose-300">
+          <ul className="mt-1 space-y-0.5 text-rose-300 sm:mt-1.5 sm:space-y-1">
             {game.fouls.map(foul => (
               <li key={foul}>{foul}</li>
             ))}
           </ul>
         ) : (
-          <p className="mt-1.5 text-white/45">No fouls on latest turn.</p>
+          <p className="mt-1 text-white/45 sm:mt-1.5">No fouls on latest turn.</p>
         )}
       </div>
 
-      <div className="mt-3 rounded-xl bg-white/5 p-2.5 text-[11px] md:text-xs">
+      <div className="mt-2 rounded-lg bg-white/5 p-1.5 text-[10px] sm:mt-3 sm:rounded-xl sm:p-2.5 sm:text-[11px] md:text-xs">
         <p className="font-medium text-white/90">Recent events</p>
-        <ul className="mt-1.5 space-y-1 text-white/45">
+        <ul className="mt-1 space-y-0.5 text-white/45 sm:mt-1.5 sm:space-y-1">
           {recentEvents.length > 0 ? (
             recentEvents.map((event, index) => <li key={`${event.type}-${index}`}>{event.type}</li>)
           ) : (
@@ -576,9 +581,9 @@ function ScoreCard({
   accent: string;
 }): JSX.Element {
   return (
-    <div className="rounded-xl bg-white/5 p-2.5">
-      <div className="text-[10px] text-white/45 md:text-xs">{label}</div>
-      <div className={`mt-1 text-lg font-bold md:text-2xl ${accent}`}>{value}</div>
+    <div className="rounded-lg bg-white/5 p-1.5 sm:rounded-xl sm:p-2.5">
+      <div className="text-[9px] text-white/45 sm:text-[10px] md:text-xs">{label}</div>
+      <div className={`mt-0.5 text-base font-bold sm:mt-1 sm:text-lg md:text-2xl ${accent}`}>{value}</div>
     </div>
   );
 }
@@ -593,9 +598,9 @@ function StatusRow({
   accent?: string;
 }): JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center justify-between gap-1 sm:gap-2">
       <span className="text-white/45">{label}</span>
-      <span className={`min-w-0 text-right capitalize ${accent ?? 'text-white'}`}>{value}</span>
+      <span className={`min-w-0 truncate text-right capitalize ${accent ?? 'text-white'}`}>{value}</span>
     </div>
   );
 }

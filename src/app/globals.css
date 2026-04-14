@@ -26,6 +26,23 @@ a,
 button,
 canvas {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Mobile touch optimizations */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific: prevent callout, copy, paste */
+  * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Allow text selection on inputs */
+  input, textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
 }
 
 button:focus-visible,
