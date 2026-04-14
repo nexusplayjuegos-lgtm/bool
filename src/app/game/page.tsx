@@ -184,12 +184,14 @@ function SharedGameCanvas({
   }, []);
 
   useEffect(() => {
-    if (!canvasRef.current) {
+    // ARQUITETO: Usar container para LayerManager, canvas para modo legado
+    const targetElement = containerRef.current;
+    if (!targetElement) {
       return;
     }
 
     if (!rendererRef.current) {
-      rendererRef.current = new PremiumRenderer(canvasRef.current, {
+      rendererRef.current = new PremiumRenderer(targetElement, {
         width: game.table.width,
         height: game.table.height,
       });
@@ -291,9 +293,9 @@ function SharedGameCanvas({
     [game.table.height, game.table.width]
   );
 
-  // Mouse handlers
+  // Mouse handlers - ARQUITETO: Atualizado para HTMLDivElement
   const handleMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
+    (event: React.MouseEvent<HTMLDivElement>) => {
       if (multiplayer && !isMyTurn) return;
 
       const point = getPointerPosition(event.clientX, event.clientY);
@@ -333,9 +335,9 @@ function SharedGameCanvas({
     game.shoot();
   }, [game, isMyTurn, multiplayer]);
 
-  // Touch handlers
+  // Touch handlers - ARQUITETO: Atualizado para HTMLDivElement
   const handleTouchMove = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
+    (event: React.TouchEvent<HTMLDivElement>) => {
       event.preventDefault();
       if (multiplayer && !isMyTurn) return;
 
@@ -363,7 +365,7 @@ function SharedGameCanvas({
   );
 
   const handleTouchStart = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
+    (event: React.TouchEvent<HTMLDivElement>) => {
       event.preventDefault();
       if (multiplayer && !isMyTurn) return;
       if (game.phase === 'aiming') {
@@ -374,7 +376,7 @@ function SharedGameCanvas({
   );
 
   const handleTouchEnd = useCallback(
-    (event: React.TouchEvent<HTMLCanvasElement>) => {
+    (event: React.TouchEvent<HTMLDivElement>) => {
       event.preventDefault();
       if (multiplayer && !isMyTurn) return;
       if (game.phase !== 'charging') return;
@@ -435,24 +437,26 @@ function SharedGameCanvas({
       {/* Game area */}
       <section className="relative flex flex-1 overflow-hidden">
         {/* Canvas container - mobile-optimized padding */}
+        {/* ARQUITETO: Container para LayerManager (canvases criados internamente) */}
         <div
           ref={containerRef}
-          className="flex flex-1 items-center justify-center overflow-hidden p-0.5 sm:p-1 md:p-2"
+          className="relative flex flex-1 items-center justify-center overflow-hidden p-0.5 sm:p-1 md:p-2"
+          onMouseMove={handleMouseMove}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onTouchMove={handleTouchMove}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <div
-            className="overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+            className="relative overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
             style={tableCardStyle}
           >
+            {/* Canvas legado - escondido quando LayerManager ativo */}
             <canvas
               ref={canvasRef}
               width={TABLE_WIDTH}
               height={TABLE_HEIGHT}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onTouchMove={handleTouchMove}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
               className="block h-full w-full cursor-crosshair touch-none"
               style={{ width: '100%', height: '100%', touchAction: 'none' }}
             />

@@ -122,56 +122,81 @@ export class PremiumRenderer {
   private uiCtx?: CanvasRenderingContext2D;
   private tableRendered = false;
   private container?: HTMLElement;
+  private usingLayers = false;
 
-  constructor(canvas: HTMLCanvasElement, config: RenderConfig) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Canvas 2D context not available');
-    }
-
-    this.canvas = canvas;
-    this.ctx = ctx;
+  constructor(containerOrCanvas: HTMLElement | HTMLCanvasElement, config: RenderConfig) {
     this.config = config;
     this.dpr = window.devicePixelRatio || 1;
 
-    this.applyCanvasSize();
+    // ARQUITETO: Detectar se é canvas ou container
+    if (containerOrCanvas instanceof HTMLCanvasElement) {
+      // Modo legado: recebeu canvas direto
+      const ctx = containerOrCanvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas 2D context not available');
+      }
+      this.canvas = containerOrCanvas;
+      this.ctx = ctx;
+      this.applyCanvasSize();
 
-    // ARQUITETO: Inicialização condicional do LayerManager
-    if (USE_LAYER_MANAGER && canvas.parentElement) {
-      this.container = canvas.parentElement;
-      this.layerManager = new LayerManager(this.container, config.width, config.height);
+      // ARQUITETO: Inicialização condicional do LayerManager (modo legado)
+      if (USE_LAYER_MANAGER && containerOrCanvas.parentElement) {
+        this.container = containerOrCanvas.parentElement;
+        this.initLayerManager();
+        containerOrCanvas.style.display = 'none';
+      }
+    } else {
+      // Modo novo: recebeu container div
+      this.container = containerOrCanvas;
 
-      // Layer 0: Mesa estática
-      this.tableCtx = this.layerManager.createLayer({
-        name: 'table',
-        zIndex: 0,
-        isStatic: true
-      });
+      // Criar canvas interno para compatibilidade
+      this.canvas = document.createElement('canvas');
+      this.canvas.width = config.width;
+      this.canvas.height = config.height;
+      this.canvas.style.display = 'none'; // Esconder canvas interno
+      this.container.appendChild(this.canvas);
 
-      // Layer 1: Bolas dinâmicas
-      this.ballsCtx = this.layerManager.createLayer({
-        name: 'balls',
-        zIndex: 1,
-        isStatic: false
-      });
+      const ctx = this.canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas 2D context not available');
+      }
+      this.ctx = ctx;
+      this.applyCanvasSize();
 
-      // Layer 2: UI/Taco
-      this.uiCtx = this.layerManager.createLayer({
-        name: 'ui',
-        zIndex: 2,
-        isStatic: false
-      });
-
-      // Esconder canvas original quando usando layers
-      canvas.style.display = 'none';
+      // ARQUITETO: Inicializar LayerManager no modo container
+      if (USE_LAYER_MANAGER) {
+        this.initLayerManager();
+        this.usingLayers = true;
+      }
     }
+  }
 
-    // Suprimir warnings de variáveis não utilizadas (serão usadas nos próximos commits)
-    void this.tableCtx;
-    void this.ballsCtx;
-    void this.uiCtx;
-    void this.tableRendered;
-    void this.container;
+  // ARQUITETO: Inicialização do LayerManager
+  private initLayerManager(): void {
+    if (!this.container) return;
+
+    this.layerManager = new LayerManager(this.container, this.config.width, this.config.height);
+
+    // Layer 0: Mesa estática
+    this.tableCtx = this.layerManager.createLayer({
+      name: 'table',
+      zIndex: 0,
+      isStatic: true
+    });
+
+    // Layer 1: Bolas dinâmicas
+    this.ballsCtx = this.layerManager.createLayer({
+      name: 'balls',
+      zIndex: 1,
+      isStatic: false
+    });
+
+    // Layer 2: UI/Taco
+    this.uiCtx = this.layerManager.createLayer({
+      name: 'ui',
+      zIndex: 2,
+      isStatic: false
+    });
   }
 
   clear(): void {
@@ -466,7 +491,7 @@ export class PremiumRenderer {
 
   // ARQUITETO: Verificar se está usando layers
   isUsingLayers(): boolean {
-    return USE_LAYER_MANAGER && !!this.layerManager;
+    return this.usingLayers || (USE_LAYER_MANAGER && !!this.layerManager);
   }
 
   private applyCanvasSize(): void {
