@@ -497,8 +497,8 @@ export class PremiumRenderer {
   private applyCanvasSize(): void {
     this.canvas.width = this.config.width * this.dpr;
     this.canvas.height = this.config.height * this.dpr;
-    this.canvas.style.width = `${this.config.width}px`;
-    this.canvas.style.height = `${this.config.height}px`;
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = '100%';
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.dpr, this.dpr);
   }

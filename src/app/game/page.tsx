@@ -11,8 +11,6 @@ import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
 
-const TABLE_WIDTH = 1200;
-const TABLE_HEIGHT = 600;
 const MOBILE_SHORT_HEIGHT = 540;
 const SUPPORTED_MODES: readonly GameMode[] = ['snooker', 'eightball', 'nineball', 'brazilian'];
 
@@ -200,6 +198,8 @@ function SharedGameCanvas({
     () => !isPortrait && viewportSize.height <= MOBILE_SHORT_HEIGHT,
     [isPortrait, viewportSize.height]
   );
+  const tableWidth = game.table.width;
+  const tableHeight = game.table.height;
 
   useEffect(() => {
     const syncViewport = (): void => {
@@ -290,8 +290,8 @@ function SharedGameCanvas({
       const availableWidth = Math.max(viewport.clientWidth - horizontalPadding, 220);
       const availableHeight = Math.max(viewport.clientHeight - verticalPadding, 160);
       const nextScale = Math.min(
-        availableWidth / TABLE_WIDTH,
-        availableHeight / TABLE_HEIGHT,
+        availableWidth / tableWidth,
+        availableHeight / tableHeight,
         1
       );
 
@@ -315,7 +315,7 @@ function SharedGameCanvas({
       window.removeEventListener('orientationchange', updateScale);
       window.visualViewport?.removeEventListener('resize', updateScale);
     };
-  }, [game.table.height, game.table.width]);
+  }, [game.table.height, game.table.width, viewportSize.width, viewportSize.height, tableHeight, tableWidth]);
 
   useEffect(() => {
     if (isCompactLandscape) {
@@ -474,11 +474,11 @@ function SharedGameCanvas({
 
   const tableCardStyle = useMemo(
     () => ({
-      width: `${TABLE_WIDTH * canvasScale}px`,
-      height: `${TABLE_HEIGHT * canvasScale}px`,
+      width: `${tableWidth * canvasScale}px`,
+      height: `${tableHeight * canvasScale}px`,
       boxShadow: '0 30px 80px rgba(0, 0, 0, 0.68)',
     }),
-    [canvasScale]
+    [canvasScale, tableWidth, tableHeight]
   );
 
   if (isPortrait) {
