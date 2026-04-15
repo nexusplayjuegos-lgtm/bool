@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Ball, Cue, GameEvent, GamePhase, Table, Vector2 } from '@/engine/types';
+import { Ball, Cue, GameEvent, GameMode, GamePhase, Table, Vector2 } from '@/engine/types';
 import { MultiplayerGameEvent } from '@/hooks/useGame';
 import { useGame } from '@/hooks/useGame';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
@@ -14,12 +14,12 @@ import { PremiumRenderer } from '@/render/canvas/PremiumRenderer';
 const TABLE_WIDTH = 1200;
 const TABLE_HEIGHT = 600;
 const MOBILE_SHORT_HEIGHT = 540;
-const MOBILE_TABLE_SCALE = 0.78;
-const MOBILE_SIDE_HUD_WIDTH = 220;
+const SUPPORTED_MODES: readonly GameMode[] = ['snooker', 'eightball', 'nineball', 'brazilian'];
 
 type PlayerNumber = 1 | 2;
 
 interface BaseGameView {
+  mode: GameMode;
   phase: GamePhase;
   balls: Ball[];
   cue: Cue;
@@ -34,6 +34,10 @@ interface BaseGameView {
   updatePower: (power: number) => void;
   shoot: () => void;
   resetGame: () => void;
+}
+
+interface LocalGameView extends BaseGameView {
+  setMode: (mode: GameMode) => void;
 }
 
 interface MultiplayerGameView extends BaseGameView {
@@ -58,6 +62,10 @@ function isMultiplayerGameView(game: GameStoreView): game is MultiplayerGameView
   return 'broadcastShot' in game && 'isMyTurn' in game;
 }
 
+function isGameMode(value: string | null): value is GameMode {
+  return value !== null && SUPPORTED_MODES.includes(value as GameMode);
+}
+
 export default function GamePage(): JSX.Element {
   return (
     <Suspense fallback={<LoadingScreen message="Loading match..." />}>
@@ -69,6 +77,8 @@ export default function GamePage(): JSX.Element {
 function GamePageContent(): JSX.Element {
   const searchParams = useSearchParams();
   const roomId = searchParams.get('room');
+  const requestedMode = searchParams.get('mode');
+  const mode = isGameMode(requestedMode) ? requestedMode : 'snooker';
   const [playerNumber, setPlayerNumber] = useState<PlayerNumber | null>(null);
   const [loading, setLoading] = useState(Boolean(roomId));
 
@@ -122,20 +132,22 @@ function GamePageContent(): JSX.Element {
   }
 
   return roomId && playerNumber ? (
-    <MultiplayerGame roomId={roomId} playerNumber={playerNumber} />
+    <MultiplayerGame roomId={roomId} playerNumber={playerNumber} mode={mode} />
   ) : (
-    <LocalGame />
+    <LocalGame mode={mode} />
   );
 }
 
 function MultiplayerGame({
   roomId,
   playerNumber,
+  mode,
 }: {
   roomId: string;
   playerNumber: PlayerNumber;
+  mode: GameMode;
 }): JSX.Element {
-  const game = useMultiplayer(roomId, playerNumber) as MultiplayerGameView;
+  const game = useMultiplayer(roomId, playerNumber, mode) as MultiplayerGameView;
   return (
     <SharedGameCanvas
       game={game}
@@ -146,8 +158,17 @@ function MultiplayerGame({
   );
 }
 
-function LocalGame(): JSX.Element {
-  const game = useGame() as BaseGameView;
+function LocalGame({ mode }: { mode: GameMode }): JSX.Element {
+  const game = useGame() as LocalGameView;
+  const currentMode = game.mode;
+  const setMode = game.setMode;
+
+  useEffect(() => {
+    if (currentMode !== mode) {
+      setMode(mode);
+    }
+  }, [currentMode, mode, setMode]);
+
   return <SharedGameCanvas game={game} multiplayer={false} roomId={null} playerNumber={null} />;
 }
 
@@ -158,7 +179,7 @@ function SharedGameCanvas({
   playerNumber,
 }: SharedGameCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<PremiumRenderer | null>(null);
   const latestGameRef = useRef<GameStoreView>(game);
   const resizeFrameRef = useRef<number | null>(null);
@@ -166,7 +187,10 @@ function SharedGameCanvas({
   const [showHud, setShowHud] = useState(true);
   const [canvasScale, setCanvasScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
-  const [viewportSize, setViewportSize] = useState({ width: TABLE_WIDTH, height: TABLE_HEIGHT });
+  const [viewportSize, setViewportSize] = useState({
+    width: game.table.width,
+    height: game.table.height,
+  });
 
   latestGameRef.current = game;
 
@@ -176,7 +200,6 @@ function SharedGameCanvas({
     () => !isPortrait && viewportSize.height <= MOBILE_SHORT_HEIGHT,
     [isPortrait, viewportSize.height]
   );
-  const isMobileViewport = viewportSize.width <= 1024;
 
   useEffect(() => {
     const syncViewport = (): void => {
@@ -214,9 +237,8 @@ function SharedGameCanvas({
       }
 
       orientationTimeoutRef.current = window.setTimeout(() => {
-        window.scrollTo(0, 1);
         scheduleSync();
-      }, 280);
+      }, 250);
     };
 
     window.addEventListener('orientationchange', handleOrientationRefresh);
@@ -237,37 +259,6 @@ function SharedGameCanvas({
   }, []);
 
   useEffect(() => {
-    const enterFullscreen = async (): Promise<void> => {
-      try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-        }
-      } catch {
-      }
-
-      try {
-        const orientation = (screen as Screen & {
-          orientation?: { lock?: (value: string) => Promise<void> };
-        }).orientation;
-
-        if (orientation?.lock) {
-          await orientation.lock('landscape');
-        }
-      } catch {
-      }
-
-      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-        setTimeout(() => window.scrollTo(0, 1), 100);
-      }
-    };
-
-    void enterFullscreen();
-    window.addEventListener('orientationchange', enterFullscreen);
-
-    return () => window.removeEventListener('orientationchange', enterFullscreen);
-  }, []);
-
-  useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
@@ -285,24 +276,24 @@ function SharedGameCanvas({
 
   useEffect(() => {
     const updateScale = (): void => {
-      const container = containerRef.current;
-      if (!container) {
+      const viewport = viewportRef.current;
+      if (!viewport) {
         return;
       }
 
-      const computed = window.getComputedStyle(container);
+      const computed = window.getComputedStyle(viewport);
       const horizontalPadding =
         Number.parseFloat(computed.paddingLeft) + Number.parseFloat(computed.paddingRight);
       const verticalPadding =
         Number.parseFloat(computed.paddingTop) + Number.parseFloat(computed.paddingBottom);
 
-      const sideHudOffset =
-        showHud && !isCompactLandscape && isMobileViewport ? MOBILE_SIDE_HUD_WIDTH : 0;
-      const widthBudget = Math.max(container.clientWidth - horizontalPadding - sideHudOffset, 220);
-      const heightBudget = Math.max(container.clientHeight - verticalPadding, 160);
-      const baseScale = Math.min(widthBudget / TABLE_WIDTH, heightBudget / TABLE_HEIGHT, 1);
-      const nextScale =
-        isMobileViewport && !isPortrait ? baseScale * MOBILE_TABLE_SCALE : baseScale;
+      const availableWidth = Math.max(viewport.clientWidth - horizontalPadding, 220);
+      const availableHeight = Math.max(viewport.clientHeight - verticalPadding, 160);
+      const nextScale = Math.min(
+        availableWidth / TABLE_WIDTH,
+        availableHeight / TABLE_HEIGHT,
+        1
+      );
 
       setCanvasScale(nextScale);
     };
@@ -310,8 +301,8 @@ function SharedGameCanvas({
     updateScale();
 
     const observer = new ResizeObserver(updateScale);
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
+    if (viewportRef.current) {
+      observer.observe(viewportRef.current);
     }
 
     window.addEventListener('resize', updateScale);
@@ -324,24 +315,7 @@ function SharedGameCanvas({
       window.removeEventListener('orientationchange', updateScale);
       window.visualViewport?.removeEventListener('resize', updateScale);
     };
-  }, [isCompactLandscape, isMobileViewport, isPortrait, showHud]);
-
-  useEffect(() => {
-    const hideBrowserChrome = (): void => {
-      window.scrollTo(0, 1);
-    };
-
-    hideBrowserChrome();
-    window.addEventListener('load', hideBrowserChrome);
-    window.addEventListener('resize', hideBrowserChrome);
-    window.addEventListener('orientationchange', hideBrowserChrome);
-
-    return () => {
-      window.removeEventListener('load', hideBrowserChrome);
-      window.removeEventListener('resize', hideBrowserChrome);
-      window.removeEventListener('orientationchange', hideBrowserChrome);
-    };
-  }, []);
+  }, [game.table.height, game.table.width]);
 
   useEffect(() => {
     if (isCompactLandscape) {
@@ -522,9 +496,9 @@ function SharedGameCanvas({
 
   return (
     <main className="game-shell flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0f] text-white">
-      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
+      <header className="game-shell-header flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
         <h1 className="truncate text-sm font-semibold text-white/80 md:text-lg">
-          {multiplayer ? `Room - P${playerNumber}` : 'Bool Eight'}
+          {multiplayer ? `Room - P${playerNumber}` : `Bool Eight - ${game.mode}`}
         </h1>
         <div className="flex items-center gap-2">
           <Link
@@ -543,29 +517,21 @@ function SharedGameCanvas({
         </div>
       </header>
 
-      <section
-        className={`game-layout relative flex flex-1 overflow-hidden ${
-          isCompactLandscape ? 'pb-14' : ''
-        }`}
-      >
+      <section className="game-shell-body game-layout relative flex flex-1 min-h-0 overflow-hidden">
         <div
-          ref={containerRef}
-          className={`game-stage flex flex-1 items-center justify-center overflow-hidden ${
-            showHud && !isCompactLandscape
-              ? isMobileViewport
-                ? 'pr-2'
-                : 'pr-2 md:pr-[304px]'
-              : ''
+          ref={viewportRef}
+          className={`game-play-viewport game-stage flex h-full w-full min-h-0 items-center justify-center overflow-hidden ${
+            isCompactLandscape ? 'pb-14' : ''
           }`}
         >
           <div
-            className="game-table-frame overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+            className="game-play-surface game-table-frame overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
             style={tableCardStyle}
           >
             <canvas
               ref={canvasRef}
-              width={TABLE_WIDTH}
-              height={TABLE_HEIGHT}
+              width={game.table.width}
+              height={game.table.height}
               onPointerMove={handlePointerMove}
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUp}
@@ -575,28 +541,30 @@ function SharedGameCanvas({
           </div>
         </div>
 
-        {showHud ? (
-          <HudPanel
-            game={game}
-            isMyTurn={isMyTurn}
-            multiplayer={multiplayer}
-            recentEvents={recentEvents}
-            onHide={() => setShowHud(false)}
-            compact={isCompactLandscape}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowHud(true)}
-            className={`absolute rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] text-white/60 backdrop-blur ${
-              isCompactLandscape
-                ? 'bottom-2 left-1/2 z-20 -translate-x-1/2'
-                : 'bottom-3 right-3 z-20 md:bottom-4 md:left-1/2 md:right-auto md:-translate-x-1/2'
-            }`}
-          >
-            Controles
-          </button>
-        )}
+        <div className="game-overlay-layer pointer-events-none absolute inset-0 z-20">
+          {showHud ? (
+            <HudPanel
+              game={game}
+              isMyTurn={isMyTurn}
+              multiplayer={multiplayer}
+              recentEvents={recentEvents}
+              onHide={() => setShowHud(false)}
+              compact={isCompactLandscape}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowHud(true)}
+              className={`absolute rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] text-white/60 backdrop-blur ${
+                isCompactLandscape
+                  ? 'bottom-2 left-1/2 z-20 -translate-x-1/2'
+                  : 'bottom-3 right-3 z-20 md:bottom-4 md:left-1/2 md:right-auto md:-translate-x-1/2'
+              }`}
+            >
+              Controles
+            </button>
+          )}
+        </div>
       </section>
     </main>
   );
@@ -619,7 +587,7 @@ function HudPanel({
 }): JSX.Element {
   return (
     <aside
-      className={`hud-overlay border border-white/10 bg-black/78 backdrop-blur-md ${
+      className={`pointer-events-auto hud-overlay border border-white/10 bg-black/78 backdrop-blur-md ${
         compact
           ? 'absolute inset-x-2 bottom-2 z-20 rounded-2xl p-3'
           : 'absolute right-2 top-2 z-20 w-[200px] rounded-2xl p-3 sm:w-[240px] md:right-6 md:top-6 md:w-[290px] md:p-4'

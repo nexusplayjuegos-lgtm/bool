@@ -59,14 +59,27 @@ a:focus-visible {
   min-height: 0;
 }
 
+.game-shell-body {
+  min-height: 0;
+}
+
 .game-stage {
   min-width: 0;
   min-height: 0;
   padding: 12px;
 }
 
+.game-play-viewport {
+  min-width: 0;
+  min-height: 0;
+}
+
 .game-table-frame {
   flex: 0 0 auto;
+}
+
+.game-overlay-layer {
+  pointer-events: none;
 }
 
 .game-canvas {
