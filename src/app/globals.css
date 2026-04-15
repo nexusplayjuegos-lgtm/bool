@@ -15,12 +15,17 @@ html {
   scroll-behavior: smooth;
   height: 100%;
   overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 body {
   height: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-geist-sans), sans-serif;
@@ -53,6 +58,9 @@ a:focus-visible {
 .game-shell {
   min-height: 100vh;
   min-height: 100dvh;
+  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 .game-layout {

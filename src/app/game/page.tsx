@@ -181,7 +181,6 @@ function SharedGameCanvas({
   const rendererRef = useRef<PremiumRenderer | null>(null);
   const latestGameRef = useRef<GameStoreView>(game);
   const resizeFrameRef = useRef<number | null>(null);
-  const orientationTimeoutRef = useRef<number | null>(null);
   const [showHud, setShowHud] = useState(true);
   const [canvasScale, setCanvasScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -202,61 +201,75 @@ function SharedGameCanvas({
   const tableHeight = game.table.height;
 
   useEffect(() => {
-    const syncViewport = (): void => {
-      const nextWidth = window.visualViewport?.width ?? window.innerWidth;
-      const nextHeight = window.visualViewport?.height ?? window.innerHeight;
+    const computeViewport = (): void => {
+      const vvWidth = window.visualViewport?.width ?? window.innerWidth;
+      const vvHeight = window.visualViewport?.height ?? window.innerHeight;
+
+      // Heurística: em telas pequenas (mobile) adicionamos padding extra de
+      // segurança para notch / home indicator / safe areas do iOS Safari/PWA.
+      const isMobileLike = vvWidth < 1024 || vvHeight < 600;
+      const basePadding = 12;
+      const safePadding = isMobileLike ? 20 : 0;
+      const totalHPad = (basePadding + safePadding) * 2;
+      const totalVPad = (basePadding + safePadding) * 2;
+
+      const availableWidth = Math.max(vvWidth - totalHPad, 220);
+      const availableHeight = Math.max(vvHeight - totalVPad, 160);
+      const nextScale = Math.min(
+        availableWidth / tableWidth,
+        availableHeight / tableHeight,
+        1
+      );
 
       setViewportSize({
-        width: Math.round(nextWidth),
-        height: Math.round(nextHeight),
+        width: Math.round(vvWidth),
+        height: Math.round(vvHeight),
       });
-      setIsPortrait(nextHeight > nextWidth);
+      setIsPortrait(vvHeight > vvWidth);
+      setCanvasScale(nextScale);
     };
 
-    const scheduleSync = (): void => {
+    const scheduleCompute = (): void => {
       if (resizeFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeFrameRef.current);
       }
-
       resizeFrameRef.current = window.requestAnimationFrame(() => {
         resizeFrameRef.current = null;
-        syncViewport();
+        computeViewport();
       });
     };
 
-    syncViewport();
-    window.addEventListener('resize', scheduleSync);
-    window.addEventListener('orientationchange', scheduleSync);
-    window.visualViewport?.addEventListener('resize', scheduleSync);
-    window.visualViewport?.addEventListener('scroll', scheduleSync);
+    computeViewport();
+    window.addEventListener('resize', scheduleCompute);
+    window.visualViewport?.addEventListener('resize', scheduleCompute);
+    window.visualViewport?.addEventListener('scroll', scheduleCompute);
 
-    const handleOrientationRefresh = (): void => {
-      scheduleSync();
-      if (orientationTimeoutRef.current !== null) {
-        window.clearTimeout(orientationTimeoutRef.current);
-      }
+    const orientationTimeouts: number[] = [];
+    const handleOrientationChange = (): void => {
+      orientationTimeouts.forEach(id => window.clearTimeout(id));
+      orientationTimeouts.length = 0;
 
-      orientationTimeoutRef.current = window.setTimeout(() => {
-        scheduleSync();
-      }, 250);
+      [0, 150, 350, 600].forEach(delay => {
+        const id = window.setTimeout(() => {
+          scheduleCompute();
+        }, delay);
+        orientationTimeouts.push(id);
+      });
     };
 
-    window.addEventListener('orientationchange', handleOrientationRefresh);
+    window.addEventListener('orientationchange', handleOrientationChange);
 
     return () => {
       if (resizeFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeFrameRef.current);
       }
-      if (orientationTimeoutRef.current !== null) {
-        window.clearTimeout(orientationTimeoutRef.current);
-      }
-      window.removeEventListener('resize', scheduleSync);
-      window.removeEventListener('orientationchange', scheduleSync);
-      window.removeEventListener('orientationchange', handleOrientationRefresh);
-      window.visualViewport?.removeEventListener('resize', scheduleSync);
-      window.visualViewport?.removeEventListener('scroll', scheduleSync);
+      orientationTimeouts.forEach(id => window.clearTimeout(id));
+      window.removeEventListener('resize', scheduleCompute);
+      window.visualViewport?.removeEventListener('resize', scheduleCompute);
+      window.visualViewport?.removeEventListener('scroll', scheduleCompute);
+      window.removeEventListener('orientationchange', handleOrientationChange);
     };
-  }, []);
+  }, [tableWidth, tableHeight]);
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -273,49 +286,6 @@ function SharedGameCanvas({
 
     rendererRef.current.resize(game.table.width, game.table.height);
   }, [game.table.height, game.table.width]);
-
-  useEffect(() => {
-    const updateScale = (): void => {
-      const viewport = viewportRef.current;
-      if (!viewport) {
-        return;
-      }
-
-      const computed = window.getComputedStyle(viewport);
-      const horizontalPadding =
-        Number.parseFloat(computed.paddingLeft) + Number.parseFloat(computed.paddingRight);
-      const verticalPadding =
-        Number.parseFloat(computed.paddingTop) + Number.parseFloat(computed.paddingBottom);
-
-      const availableWidth = Math.max(viewport.clientWidth - horizontalPadding, 220);
-      const availableHeight = Math.max(viewport.clientHeight - verticalPadding, 160);
-      const nextScale = Math.min(
-        availableWidth / tableWidth,
-        availableHeight / tableHeight,
-        1
-      );
-
-      setCanvasScale(nextScale);
-    };
-
-    updateScale();
-
-    const observer = new ResizeObserver(updateScale);
-    if (viewportRef.current) {
-      observer.observe(viewportRef.current);
-    }
-
-    window.addEventListener('resize', updateScale);
-    window.addEventListener('orientationchange', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateScale);
-      window.removeEventListener('orientationchange', updateScale);
-      window.visualViewport?.removeEventListener('resize', updateScale);
-    };
-  }, [game.table.height, game.table.width, viewportSize.width, viewportSize.height, tableHeight, tableWidth]);
 
   useEffect(() => {
     if (isCompactLandscape) {

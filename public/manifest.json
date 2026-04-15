@@ -1,0 +1,11 @@
+{
+  "name": "Bool - Sinuca Premiere",
+  "short_name": "Bool",
+  "description": "Premium pool game with realistic physics",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": []
+}
